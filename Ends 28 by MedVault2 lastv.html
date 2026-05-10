@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Previous year exam</title>
+
+<style>
+body{
+    font-family: Arial;
+    background:#f1f5f9;
+    margin:0;
+    padding:10px;
+}
+.container{
+    max-width:650px;
+    margin:auto;
+    background:#fff;
+    border-radius:20px;
+    padding:20px;
+}
+.bank-title{text-align:center;font-size:26px;font-weight:bold;}
+.bank-sub{text-align:center;color:#555;margin-bottom:20px;}
+
+.subject-card{
+    background:#f8fafc;
+    padding:20px;
+    border-radius:20px;
+    margin-bottom:15px;
+    cursor:pointer;
+}
+
+.question-card{
+    margin-bottom:20px;
+    padding:15px;
+    border-radius:15px;
+    background:#fafafa;
+}
+
+.option{
+    background:#eef2ff;
+    padding:10px;
+    border-radius:10px;
+    margin:8px 0;
+    cursor:pointer;
+}
+.correct{background:#22c55e;color:#fff}
+.wrong{background:#ef4444;color:#fff}
+
+button{
+    padding:10px;
+    border:none;
+    border-radius:15px;
+    background:#2563eb;
+    color:white;
+    font-weight:bold;
+    width:48%;
+}
+
+.progress{
+    height:8px;
+    background:#ddd;
+    border-radius:10px;
+    overflow:hidden;
+    margin:10px 0;
+}
+.progress-bar{
+    height:100%;
+    width:0%;
+    background:#2563eb;
+}
+
+/* Overview */
+.overview-btn{
+    display:inline-block;
+    padding:6px 10px;
+    margin:3px;
+    background:#e2e8f0;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:12px;
+}
+.overview-btn.active{background:#2563eb;color:white;}
+.overview-btn.answered{background:#22c55e;color:white;}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HOME -->
+<div id="home">
+    <div class="bank-title">📘 Previous year exam</div>
+    <div class="bank-sub">By MedVault</div>
+
+    <div class="subject-card" onclick="openExam('egyptian')">🇪🇬 End28 Egyptian</div>
+    <div class="subject-card" onclick="openExam('wafedeen')">🌍 End28 Wafedeen</div>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz" style="display:none;">
+    <button onclick="goHome()">⬅ Back</button>
+    <h2 id="title"></h2>
+
+    <div>Progress: <span id="progressText">0%</span></div>
+    <div class="progress"><div id="bar" class="progress-bar"></div></div>
+
+    <div id="overview" style="overflow-x:auto;white-space:nowrap;"></div>
+
+    <div id="questionContainer"></div>
+
+    <div style="display:flex;gap:10px;">
+        <button onclick="prev()">Previous</button>
+        <button onclick="next()">Next</button>
+    </div>
+</div>
+
+<!-- RESULT -->
+<div id="result" style="display:none;">
+    <h2>🎉 Result</h2>
+    <h3 id="scoreText"></h3>
+
+    <button onclick="reviewWrong()">Review Mistakes</button>
+    <button onclick="showAllAnswers()">Show All Answers</button>
+    <button onclick="restartExam()">Restart</button>
+    <button onclick="goHome()">Back Home</button>
+</div>
+
+</div>
+
+<script>
+function restartExam(){
+    currentIndex = 0;
+    answers = {};
+
+    localStorage.removeItem("v2_progress_"+currentExam);
+
+    show("quiz");
+    render();
+}
+function showAllAnswers(){
+    currentIndex = 0;
+    show("quiz");
+
+    // نعتبر كل الأسئلة متجاوبة عشان يظهر الصح والغلط
+    questions.forEach(q=>{
+        if(answers[q.id] == null){
+            answers[q.id] = -1; // unanswered
+        }
+    });
+
+    render();
+}
+// PARSE
+function parseQuestions(text){
+    return text.split('---').filter(b=>b.trim()).map((block,index)=>{
+        const lines = block.trim().split('\n').filter(l=>l.trim());
+
+        const question = lines[0].replace(/Q\d+:\s*/i,'');
+
+        const options = lines
+            .filter(l => /^[A-Da-d][\.\)]/.test(l))
+            .map(l => l.replace(/^[A-Da-d][\.\)]\s*/,'').trim());
+
+        const answerLine = lines.find(l =>
+            l.toLowerCase().includes("correct")
+        );
+
+        const correctLetter = answerLine
+            .split(':')[1]
+            .trim()
+            .charAt(0)
+            .toUpperCase();
+
+        const correctIndex = correctLetter.charCodeAt(0) - 65;
+
+        return {
+            id:index+1,
+            text:question,
+            options:options,
+            correct:correctIndex
+        };
+    });
+}
+
+// PUT TEXT
+const egyptianText = `
+
+Q1: A patient is diagnosed with amyloidosis. Which specialized stain is characteristically used to identify amyloid deposits in tissue sections?
+A. H&E
+B. Congo red
+C. Masson's trichrome
+D. Periodic acid-Schiff
+Correct Answer: B
+
+---
+
+Q2: A genetic mutation leads to the premature appearance of a stop codon in the mRNA sequence. What is the specific term for this type of mutation?
+A. Missense mutation
+B. Silent mutation
+C. Nonsense mutation
+D. Frameshift mutation
+Correct Answer: C
+
+---
+
+Q3: A patient's medical record indicates a diagnosis of hemophilia. According to standard inheritance patterns, what is the most common mode of inheritance for this disorder?
+A. Autosomal dominant
+B. Autosomal recessive
+C. X-linked recessive
+D. Mitochondrial
+Correct Answer: C
+
+---
+
+Q4: A patient presents with swelling, edema, and redness. Treatment with a certain drug provided pain relief but did not reduce the redness, swelling, or edema. What is the primary mechanism directly responsible for the persistent redness in this patient?
+A. Increased vascular permeability
+B. Vasodilation
+C. Leukocyte emigration
+D. Release of lysosomal enzymes
+Correct Answer: B
+
+---
+
+Q5: Based on the previous Question which analgesic medication was most likely administered?
+A. An NSAID
+B. A corticosteroid
+C. Paracetamol
+D. An opioid
+Correct Answer: C
+
+---
+
+Q6: A patient is diagnosed with subacute infective endocarditis. Which microorganism is the most common causative agent for this condition?
+A. Staphylococcus aureus
+B. Streptococcus pyogenes
+C. Streptococcus viridans
+D. Streptococcus pneumoniae
+Correct Answer: C
+
+---
+
+Q7: A patient with chronic rheumatic heart disease is found to have valve deformities described as fish-mouth or button hole stenosis. Which valve is characteristically affected by this morphological change in rheumatic heart disease?
+A. Aortic valve
+B. Pulmonary valve
+C. Tricuspid valve
+D. Mitral valve
+Correct Answer: D
+
+---
+
+Q8: In the context of gangrene, what is the anatomical line of separation?
+A. The boundary between healthy tissue and granulation tissue
+B. The zone of hyperemia surrounding an infarct
+C. The junction between healthy tissue and necrotic/gangrenous tissue
+D. The layer of thrombus occluding a blood vessel
+Correct Answer: C
+
+---
+
+Q9: What is the medical definition of pyemia?
+A. The presence of bacterial toxins in the blood
+B. The proliferation of bacteria in the blood without dissemination
+C. Septic emboli traveling through the bloodstream
+D. A severe allergic reaction to bacterial antigens
+Correct Answer: C
+
+---
+
+Q10: A blood clot is primarily composed of which of the following components?
+A. A collection of red blood cells only
+B. A collection of white blood cells only
+C. Fibrin and platelets
+D. Aggregated endothelial cells
+Correct Answer: C
+
+---
+
+Q11: Which of the following conditions is most likely to be comlicated by systemic emboli?
+A. Deep vein thrombosis
+B. Aortic aneurysm
+C. Rheumatic carditis
+D. Pulmonary embolism
+Correct Answer: B
+
+---
+
+Q12: A histopathology report states that a malignant tumor has not breached the basement membrane. What is the correct term for this lesion?
+A. Carcinoma in situ
+B. Invasive carcinoma
+C. Dysplasia
+D. Metastatic carcinoma
+Correct Answer: A
+
+---
+
+Q13: A patient has a history of chronic exposure to aflatoxin B. For which type of cancer is this patient at significantly increased risk?
+A. Lung cancer
+B. Liver cancer
+C. Colon cancer
+D. Leukemia
+Correct Answer: B
+
+---
+
+Q14: Clonal anergy in lymphocytes, as seen in some autoimmune conditions, is primarily caused by the absence of which signal?
+A. Antigen binding to the T-cell receptor
+B. Co-stimulatory molecules
+C. Cytokine signaling
+D. Apoptosis signal
+Correct Answer: B
+
+---
+
+Q15: Which of the following cellular changes is considered completely reversible once the injurious stimulus is removed?
+A. Karyorrhexis
+B. Release of lysosomal enzymes into the cytoplasm
+C. Pyknosis
+D. Fatty change in the liver
+Correct Answer: D
+
+---
+
+Q16: A researcher repeatedly applies growth factors to a tissue sample, but the tissue fails to proliferate. This indicates that the tissue is composed primarily of which cell type?
+A. Labile cells
+B. Stable cells
+C. Permanent cells
+D. Progenitor cells
+Correct Answer: C
+
+---
+
+Q17: A patient with chronic kidney disease is prescribed a drug that is primarily excreted by the kidneys. The drug has a narrow therapeutic index. What type of adverse effect is most likely to occur due to drug accumulation?
+A. Type A adverse effect
+B. Type II adverse effect
+C. Type C adverse effect
+D. Type D adverse effect
+Correct Answer: A
+
+---
+
+Q18: A patient is prescribed a scopolamine transdermal patch to prevent motion sickness. What is the correct instruction regarding its application?
+A. Apply one hour before the trip
+B. Apply the patch directly on the area of motion sickness and massage the area
+C. Apply a new patch every day for a week before travel
+D. Apply the patch several hours before the anticipated travel
+Correct Answer: D
+
+---
+
+Q19: What is the most common cause of death in a patient suffering from a morphine overdose?
+A. Cardiovascular collapse
+B. Seizures and status epilepticus
+C. Respiratory depression
+D. Hepatocellular necrosis
+Correct Answer: C
+
+---
+
+Q20: A patient is started on rosuvastatin immediately after suffering an ischemic stroke. What is the primary goal of initiating a high-potency statin in this acute post-stroke setting?
+A. Primary prevention of a first cardiovascular event
+B. Secondary prevention to stabilize the atherosclerotic plaque and prevent recurrence
+C. To acutely dissolve the thrombus that caused the stroke
+D. To lower LDL cholesterol by exactly 30%
+Correct Answer: B
+
+---
+
+Q21: A patient is diagnosed with iron deficiency anemia, and iron supplementation is initiated. After the hemoglobin levels have normalized, how long should iron therapy typically be continued?
+A. 1-2 weeks
+B. 3-6 months
+C. Until the patient feels better
+D. Indefinitely
+Correct Answer: B
+
+---
+
+Q22: A patient with a history of migraines and essential tremor is prescribed propranolol. This medication is classified as which of the following?
+A. Cardioselective beta-1 antagonist
+B. Non-selective beta-adrenergic antagonist
+C. Alpha-1 selective antagonist
+D. Beta-2 selective agonist
+Correct Answer: B
+
+---
+
+Q23: The local anesthetic bupivacaine has a long duration of action compared to other agents like lidocaine. What is the primary pharmacokinetic reason for this prolonged effect?
+A. High lipid solubility leading to high potency
+B. Rapid hepatic metabolism
+C. High plasma protein binding capacity
+D. Low molecular weight allowing rapid diffusion
+Correct Answer: C
+
+---
+
+Q24: Analysis of a patient's gene shows a segment of the DNA sequence is missing. What is the correct term for this type of genetic mutation?
+A. Deletion
+B. Duplication
+C. Insertion
+D. Inversion
+Correct Answer: A
+
+---
+
+Q25: Which of the following cellular changes indicative of injury is considered irreversible?
+a) Irreversible DNA clumping
+b) Mitochondrial vacuolization
+c) Nuclear unaffected
+d) Release of lysosomal enzymes
+Correct Answer : D
+
+---
+
+Q26: Which of the following is an example of physiological atrophy?
+a) Muscle wasting due to denervation
+b) Cardiac muscle atrophy in chronic ischemia
+c) Ovary after menopause
+d) Brain atrophy in Alzheimer's disease
+Correct Answer : C
+
+---
+
+Q27: Epistaxis refers to:
+a) Bleeding from the ear
+b) Coughing up blood
+c) Vomiting blood
+d) Bleeding from the nose
+Correct Answer : D
+
+---
+
+Q28: Which of the following malignant tumors has an epithelial origin?
+a) Squamous cell carcinoma
+b) Leiomyosarcoma
+c) Liposarcoma
+d) Osteosarcoma
+Correct Answer : A
+
+---
+
+Q29: In malignant hypertension, which of the following vascular changes is most characteristically observed?
+a) Fibromuscular dysplasia
+b) Hyaline arteriolosclerosis
+c) Monckeberg medial calcific sclerosis
+d) Hyperplastic arteriolosclerosis
+Correct Answer : D
+
+---
+
+Q30: A 60-year-old man has difficulty initiating urination due to benign prostatic hyperplasia (BPH). He also has uncontrolled hypertension (160/100 mmHg) despite being on triple antihypertensive therapy. Which drug would be the most appropriate add-on treatment that could address both conditions?
+a) Tamsulosin
+b) Terazosin
+c) Atenolol
+d) Propranolol
+Correct Answer : B
+
+---
+
+Q31: A new medication is being developed to replace warfarin. It is already shown to be more potent. Before the FDA approves this drug for clinical use, which type of study is most essential?
+a) To assess maximum tolerated dose
+b) To evaluate preliminary efficacy in small groups
+c) To compare effectiveness and monitor side effects in large populations
+d) A study to determine the dose that causes bleeding in 50% of patients
+Correct Answer : D
+
+---
+
+Q32: Which of the following drugs are indicated to treat AHF?
+a) Propranolol
+b) Dobutamine
+c) Atenolol
+d) Labetalol
+Correct Answer : B
+
+---
+
+Q33: Which of the following is contraindicated to a patient with bronchial asthma?
+a) Salbutamol
+b) Timolol
+c) Terbutaline
+d) Ritodrine
+Correct Answer : B
+
+---
+
+Q34: A 58-year-old woman undergoing radiation therapy for head and neck cancer presents with persistent dry mouth, difficulty swallowing, and frequent dental caries. Examination shows decreased salivary pooling and oral mucosal dryness.Which of the following medications is most appropriate to alleviate her symptoms?
+a) Atropine
+b) Pilocarpine
+c) Oxybutynin
+d) Propranolol
+Correct Answer : B
+
+---
+
+Q35: Which of the following drugs is most commonly used to reverse non-depolarizing neuromuscular blockade after surgery?
+a) Succinylcholine
+b) Atropine
+c) Neostigmine
+d) Rocuronium
+Correct Answer : C
+
+---
+
+Q36: 6 month old male was brought to the ER by his parents. His symptoms were: Coughing, low weight with low ability to gain weight, Visible nasal polyps on examination, digital nail clubbing, enlarge liver. Chest X-ray showed bronchiectasis, blood tests showed sodium 72 mEq/L (norm: 135-145 mEq/L)genetic screening showed he had Cystic Fibrosis with mutation in CFTR gene :c.1521-1522-1523delCTT (p.Phe508del) and family pedigree shown: What's type of mutation?
+a) Missense
+b) Nonsense
+c) Frame shift deletion
+d) Inframe deletion
+Correct Answer : D
+
+`;
+
+const wafedeenText = `
+
+Q1: A medical student experiences severe tachycardia and tremor before examinations. Which medication is most appropriate for prophylactic management of performance anxiety?
+A. Clonidine
+B. Alprazolam
+C. Propranolol
+D. Hydroxyzine
+Correct answer: C
+
+---
+
+Q2: At autopsy, a hemorrhagic infarct is found in an organ. In which of the following organs is a red infarct most commonly observed?
+A. Brain
+B. Lung
+C. Kidney
+D. Heart
+Correct answer: B
+
+---
+
+Q3: A 55-year-old man with familial hypercholesterolemia has high LDL . Which cellular finding is most directly associated with the effect of elevated LDL on the arterial wall?
+A. Amyloid deposition in the endothelium
+B. Smooth muscle proliferation in the media
+C. Neutrophilic infiltration of the adventitia
+D. Foam cells within the intima
+Correct answer: D
+
+---
+
+Q4: Prior to electroconvulsive therapy, a muscle relaxant is administered to prevent traumatic muscle contractions. Which drug is most commonly used for this purpose?
+A. Vecuronium
+B. Succinylcholine
+C. Rocuronium
+D. Pancuronium
+Correct answer: B
+
+---
+
+Q5: A patient with myasthenia gravis is treated with neostigmine. What is the primary mechanism of action of this drug?
+A. Direct activation of muscarinic receptors
+B. Inhibition of acetylcholinesterase
+C. Blockade of nicotinic acetylcholine receptors
+D. Increased release of acetylcholine from presynaptic terminals
+Correct answer: B
+
+---
+
+Q6: During an acute inflammatory response, the affected area becomes red . This clinical sign is primarily caused by which of the following?
+A. Thrombosis of venules
+B. Vasodilation of arterioles
+C. Increased vascular permeability
+D. Emigration of leukocytes
+Correct answer: B
+
+---
+
+Q7: A 70-year-old farmer has a pearly nodule on his cheek. Biopsy reveals basal cell carcinoma. Which statement best describes the biological behavior of this tumor?
+A. Highly aggressive with early lymphatic metastasis
+B. Locally malignant, rarely metastasizes
+C. Benign with no recurrence after excision
+D. Requires systemic chemotherapy as first-line treatment
+Correct answer: B
+
+---
+
+Q8: A patient with right-sided heart failure presents with hepatomegaly and ascites. Chronic venous congestion of the liver is most commonly associated with which condition?
+A. Portal vein thrombosis
+B. Right-sided heart failure
+C. Left-sided heart failure
+D. Hepatic artery stenosis
+Correct answer: B
+
+---
+
+Q9: A farm worker presents with miosis, excessive salivation, diarrhea, and muscle fasciculations after accidental exposure to an organophosphate pesticide. What is the initial treatment of choice?
+A. Pralidoxime
+B. Diazepam
+C. Naloxone
+D. IV atropine
+Correct answer: D
+
+---
+
+Q10: Ischemic injury to a cell leads to rapid depletion of ATP. Which subcellular structure is most directly responsible for ATP synthesis, and its injury directly causes ATP depletion?
+A. Nucleus
+B. Mitochondria
+C. Endoplasmic reticulum
+D. Lysosomes
+Correct answer: B
+
+---
+
+Q11: Myocardial infarction most commonly involves which region of the heart?
+A. Interventricular septum only
+B. Right ventricle
+C. Atria
+D. Left ventricle
+Correct answer: D
+
+---
+
+Q12: Chronic endothelial injury is a key initiating event in the pathogenesis of which of the following diseases?
+A. Polyarteritis nodosa
+B. Thromboangiitis obliterans
+C. Atherosclerosis
+D. Amyloidosis
+Correct answer: C
+
+---
+
+Q13: A mutation that results in the deletion of a single nucleotide within the coding sequence of a gene is most likely to cause which type of mutation?
+A. Missense mutation
+B. Frameshift mutation
+C. Nonsense mutation
+D. Silent mutation
+Correct answer: B
+
+---
+
+Q14: A patient complains of a painful scar following a prior surgical procedure. On examination, there is localized tenderness and hyperalgesia around the scar. What is the most likely underlying cause?
+A. Hypertrophic scar
+B. Keloid formation
+C. Nerve inclusion 
+D. Foreign body reaction
+Correct answer: C
+
+---
+
+Q15: Purulent exudate is commonly seen in bacterial infections. What is the primary cellular component of pus?
+A. Lymphocytes
+B. Eosinophils
+C. Live bacteria
+D. Dead neutrophils
+Correct answer: D
+
+---
+
+Q16: Which pharmacological parameter is most commonly used to assess the safety margin of a drug?
+A. Volume of distribution
+B. Therapeutic index
+C. Half-life
+D. Bioavailability
+Correct answer: B
+
+---
+
+Q17: A child develops acute rheumatic fever several weeks after untreated group A streptococcal pharyngitis. Which immunological mechanism is responsible for the cardiac and joint manifestations?
+A. Immune complex deposition in small vessels
+B. Molecular mimicry leading to cross-reactivity
+C. Type I hypersensitivity reaction
+D. Direct bacterial invasion of cardiac tissue
+Correct answer: B
+
+---
+
+Q18: A postmenopausal woman undergoes oophorectomy, and the removed ovary is found to be small and shrunken. This change is best described as which type of atrophy?
+A. Pathological atrophy
+B. Physiological atrophy
+C. Disuse atrophy
+D. Neurogenic atrophy
+Correct answer: B
+
+---
+
+Q19: An abnormal epithelialized connection between two internal organs or between an internal organ and the body surface is defined as which of the following?
+A. Sinus tract
+B. Ulcer
+C. Fistula
+D. Abscess
+Correct answer: C
+
+---
+
+Q20: In histopathological examination of a necrotic cell, the nucleus breaks into small fragments. What is the correct term for this finding?
+A. apoptosis
+B. Pyknosis
+C. Karyolysis
+D. Karyorrhexis
+Correct answer: D
+
+---
+
+Q21: Opioid analgesics produce their postsynaptic effect in the central nervous system primarily through which direct cellular mechanism?
+A. Activation of NMDA receptors
+B. Hyperpolarization via increased potassium conductance
+C. Depolarization via sodium influx
+D. Inhibition of GABA release from presynaptic terminals
+Correct answer: B
+
+---
+
+Q22: Which of the following statements correctly describes both tetracaine and benzocaine?
+A. both are primarily metabolized by the liver
+B. both are amide-type local anesthetics
+C. both are ester-type local anesthetics
+D. both are used exclusively for spinal anesthesia
+Correct answer: C
+
+---
+
+Q23: A patient with infective endocarditis develops septic emboli to multiple organs, resulting in microabscesses throughout the body. This condition is best described as which of the following?
+A. Bacteremia
+B. Septic shock
+C. Disseminated intravascular coagulation
+D. Systemic pyemia
+Correct answer: D
+
+---
+
+Q24: A patient with small cell lung cancer presents with hyperglycemia, hypertension, and easy bruising. Laboratory tests show elevated serum cortisol. What is the most likely mechanism for this patient's symptoms?
+A. Pituitary adenoma
+B. Adrenal adenoma
+C. Para neoplastic syndrome 
+D. Hormone production from neoplastic cells
+Correct answer: C
+
+---
+
+Q25: A patient with rheumatoid arthritis and fever is prescribed an NSAID that selectively reduces inflammation and fever by inhibiting which enzyme?
+A. Phospholipase A2
+B. Lipoxygenase
+C. Cyclooxygenase-1
+D. Cyclooxygenase-2 
+Correct answer: D
+
+---
+
+Q26: Metastatic calcification occurs in normal tissues due to hypercalcemia. Which of the following sites is commonly affected by metastatic calcification?
+A. Liver
+B. Skeletal muscle
+C. Brain
+D. Alveoli of the lung
+Correct answer: D
+
+`;
+
+const egyptianQuestions = parseQuestions(egyptianText);
+const wafedeenQuestions = parseQuestions(wafedeenText);
+
+let questions=[];
+let currentIndex=0;
+let answers={};
+let currentExam="";
+
+// OPEN
+function openExam(type){
+    currentExam=type;
+
+    questions = (type==="egyptian") ? egyptianQuestions : wafedeenQuestions;
+    document.getElementById("title").innerText = type;
+
+    loadProgress();
+    show("quiz");
+    render();
+}
+
+// SAVE
+function saveProgress(){
+    localStorage.setItem("v2_progress_"+currentExam,JSON.stringify({
+        index:currentIndex,
+        answers:answers
+    }));
+}
+
+function loadProgress(){
+    const data=localStorage.getItem("v2_progress_"+currentExam);
+    if(data){
+        const p=JSON.parse(data);
+        currentIndex=p.index;
+        answers=p.answers||{};
+    }else{
+        currentIndex=0;
+        answers={};
+    }
+}
+
+// UI NAV
+function show(id){
+    ["home","quiz","result"].forEach(d=>{
+        document.getElementById(d).style.display="none";
+    });
+    document.getElementById(id).style.display="block";
+}
+
+function goHome(){ show("home"); }
+
+// RENDER
+function render(){
+    const q=questions[currentIndex];
+
+    let html=`<div class="question-card"><b>Q${currentIndex+1}:</b> ${q.text}`;
+
+    q.options.forEach((opt,i)=>{
+        let cls="option";
+        if(answers[q.id]!=null){
+            if(i===q.correct) cls+=" correct";
+            else if(i===answers[q.id]) cls+=" wrong";
+        }
+        html+=`<div class="${cls}" onclick="select(${i})">${opt}</div>`;
+    });
+
+    html+="</div>";
+
+    document.getElementById("questionContainer").innerHTML=html;
+
+    updateProgress();
+    renderOverview();
+}
+
+// SELECT
+function select(i){
+    const q=questions[currentIndex];
+    if(answers[q.id]!=null) return;
+
+    answers[q.id]=i;
+    saveProgress();
+    render();
+}
+
+// NAV
+function next(){
+    if(currentIndex < questions.length-1){
+        currentIndex++;
+        saveProgress();
+        render();
+    }else{
+        showResult();
+    }
+}
+
+function prev(){
+    if(currentIndex > 0){
+        currentIndex--;
+        saveProgress();
+        render();
+    }
+}
+
+// PROGRESS
+function updateProgress(){
+    const percent=Math.round((currentIndex+1)/questions.length*100);
+    document.getElementById("progressText").innerText=percent+"%";
+    document.getElementById("bar").style.width=percent+"%";
+}
+
+// OVERVIEW
+function renderOverview(){
+    let html="";
+    questions.forEach((q,i)=>{
+        let cls="overview-btn";
+        if(i===currentIndex) cls+=" active";
+        else if(answers[q.id]!=null) cls+=" answered";
+        html+=`<span class="${cls}" onclick="goTo(${i})">${i+1}</span>`;
+    });
+    document.getElementById("overview").innerHTML=html;
+}
+
+function goTo(i){
+    currentIndex=i;
+    saveProgress();
+    render();
+}
+
+// RESULT
+function showResult(){
+    let score=0;
+    questions.forEach(q=>{
+        if(answers[q.id]===q.correct) score++;
+    });
+
+    document.getElementById("scoreText").innerText =
+        `${score} / ${questions.length}`;
+
+    show("result");
+}
+
+// REVIEW WRONG
+function reviewWrong(){
+    currentIndex = questions.findIndex(q => answers[q.id] !== q.correct);
+    show("quiz");
+    render();
+}
+
+</script>
+
+</body>
+</html>
